@@ -1,3 +1,5 @@
+import { NoteAppearanceControls } from '@/components/notes/NoteAppearanceControls'
+import { resolveNoteOpacity } from '@/lib/note-appearance'
 import { lazy, memo, Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence } from 'framer-motion'
@@ -157,8 +159,8 @@ export function NoteWindow({ noteId, isNew }: NoteWindowProps) {
   const openMenu = useCallback(() => {
     if (menuBtnRef.current) {
       const rect = menuBtnRef.current.getBoundingClientRect()
-      const menuWidth = Math.min(176, Math.max(144, window.innerWidth - 16))
-      const menuHeight = Math.min(360, Math.max(120, window.innerHeight - 16))
+      const menuWidth = Math.min(224, Math.max(144, window.innerWidth - 16))
+      const menuHeight = Math.min(480, Math.max(120, window.innerHeight - 16))
       const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth))
       const top = Math.max(8, Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 4))
       setMenuPos({ top, left })
@@ -422,7 +424,7 @@ export function NoteWindow({ noteId, isNew }: NoteWindowProps) {
   const noteColorHex = normalizeHexColor(note.color)
   const noteSurfaceColor = noteColorHex
   const bgHex = noteSurfaceColor.replace('#', '')
-  const noteOpacity = settings.backgroundOpacity
+  const noteOpacity = resolveNoteOpacity(note.backgroundOpacity, settings.backgroundOpacity)
   const bgWithAlpha = `#${bgHex}${Math.round(noteOpacity * 255).toString(16).padStart(2, '0')}`
   const noteFont = settings.fontFamily || defaultSystemFont
   const requestedNoteFontSize = clampFontSize(settings.fontSize || 14)
@@ -543,32 +545,14 @@ export function NoteWindow({ noteId, isNew }: NoteWindowProps) {
           {showMenu && createPortal(
             <div className="fixed inset-0 z-[9999]" onClick={() => setShowMenu(false)}>
               <div
-                className="absolute max-h-[calc(100vh-16px)] w-[min(11rem,calc(100vw-16px))] overflow-y-auto bg-background/95 backdrop-blur-xl border border-white/8 rounded-lg shadow-2xl py-1 z-[10000]"
+                className="absolute max-h-[calc(100vh-16px)] w-[min(14rem,calc(100vw-16px))] overflow-y-auto bg-background/95 backdrop-blur-xl border border-white/8 rounded-lg shadow-2xl py-1 z-[10000]"
                 style={{ top: menuPos.top, left: menuPos.left }}
                 onClick={(e) => e.stopPropagation()}
                 role="menu"
                 aria-label="便签操作"
                 onKeyDown={handleMenuKeyDown}
               >
-                <div className="px-2.5 py-1">
-                  <div className="flex gap-1 flex-wrap max-w-[152px]">
-                    {NOTE_COLOR_PALETTE.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => { updateNote({ ...note, color: c, updatedAt: new Date().toISOString() }); setShowMenu(false) }}
-                        className={`touch-target w-6 h-6 rounded-full transition-transform hover:scale-110 ${c === noteColorHex ? 'ring-1.5 ring-white/70 ring-offset-1 ring-offset-background' : ''}`}
-                        style={{
-                          backgroundColor: c,
-                          boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.18), 0 0 0 1px rgba(255,255,255,0.20)',
-                        }}
-                        aria-label={`将便签颜色设为 ${c}`}
-                        role="menuitemradio"
-                        aria-checked={c === noteColorHex}
-                        autoFocus={c === NOTE_COLOR_PALETTE[0]}
-                      />
-                    ))}
-                  </div>
-                </div>
+                <NoteAppearanceControls note={note} globalOpacity={settings.backgroundOpacity} />
                 <hr className="border-white/5" />
                 {isEcho ? (
                   <div>

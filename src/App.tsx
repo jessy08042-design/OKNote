@@ -6,6 +6,7 @@ import { MotionConfig } from 'framer-motion'
 const CalendarWindow = lazy(() => import('@/components/windows/CalendarWindow').then((module) => ({ default: module.CalendarWindow })))
 const NoteWindow = lazy(() => import('@/components/windows/NoteWindow').then((module) => ({ default: module.NoteWindow })))
 const SettingsWindow = lazy(() => import('@/components/windows/SettingsWindow').then((module) => ({ default: module.SettingsWindow })))
+const DesktopTabWindow = lazy(() => import('@/components/windows/DesktopTabWindow').then((module) => ({ default: module.DesktopTabWindow })))
 
 function WindowFallback() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
   }, [])
 
   const renderWindow = () => {
+    if (hash === '#/desktop-tab') return <DesktopTabWindow />
     if (hash.startsWith('#/calendar')) return <CalendarWindow />
     if (hash.startsWith('#/note/')) {
       const rest = hash.replace('#/note/', '')

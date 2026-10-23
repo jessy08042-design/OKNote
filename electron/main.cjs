@@ -34,6 +34,8 @@ const { createCalendarPresentation } = require('./calendar-presentation.cjs');
 const { waitForNativeNotification } = require('./notification-delivery.cjs');
 const { notificationSettingsState, suppressNotificationFallback } = require('./notification-settings.cjs');
 const calendarPresentation = createCalendarPresentation(configureDesktopWindow, app);
+const desktopTab = require('./desktop-tab.cjs');
+let tabController = null;
 const { setWindowsLoginItem, macLoginItemState, setMacLoginItem } = require('./login-item-state.cjs');
 const { watchMouseRelease } = require('./drag-release-watch.cjs');
 const {
@@ -236,6 +238,9 @@ function attachDraftCloseGuard(win) {
   if (!win || win.isDestroyed()) return;
   const webContentsId = win.webContents.id;
   win.on('close', (event) => {
+    if (!forceAppQuit && !app.isQuitting && win === winRegistry.calendar && appSettings.desktopTab.enabled) {
+      event.preventDefault(); hideCalendarForTab(); return;
+    }
     if (forceAppQuit || forceCloseWindows.has(win) || getWindowDraftKinds(win).length === 0) return;
     event.preventDefault();
     if (closePromptWindows.has(win)) return;
@@ -380,6 +385,7 @@ let appSettings = {
   globalFontSize: 14,
   calendar: { ...perWindowDefaults, edgeAutoHide: process.platform !== 'darwin', showDockArea: true },
   notes: { ...perWindowDefaults },
+  desktopTab: { ...desktopTab.defaults },
 };
 let settingsReadOnly = false;
 
@@ -418,6 +424,7 @@ function loadSettings() {
       appSettings.globalFontSize = clampFontSetting(raw.globalFontSize);
       appSettings.calendar = normalizeWindowSettings(raw.calendar, perWindowDefaults, true);
       appSettings.notes = normalizeWindowSettings(raw.notes, perWindowDefaults);
+      appSettings.desktopTab = desktopTab.normalize(raw.desktopTab);
     } else if (hadStoredSettings) {
       queueStartupReliabilityIssue('设置已恢复默认', '设置文件内容无效，应用已使用安全默认值；原文件仍保留在用户数据目录。');
     }
@@ -1506,6 +1513,30 @@ function ensureWindowVisible(win) {
 }
 
 // ── Calendar ──
+function hideCalendarForTab(){
+  calendarPresentation.restore();
+  winRegistry.calendar?.hide();
+  clearEdgeTimers(); stopEdgePolling();
+}
+function applyDesktopTabMode(hideOnEnable=false){
+  if(appSettings.desktopTab.enabled){
+    clearEdgeTimers(); stopEdgePolling();
+    if(isCalendarCollapsed && winRegistry.calendar) expandCalendar(winRegistry.calendar,false);
+    if(hideOnEnable) hideCalendarForTab();
+  }
+  tabController?.sync();
+}
+function initializeDesktopTab(){
+  tabController=desktopTab.createDesktopTab({
+    BrowserWindow, screen, Menu, getSettings:()=>appSettings.desktopTab, commit:scheduleSettingsCommit,
+    windowOptions:{ webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true} },
+    loadURL:makeWidgetURL('/desktop-tab'), harden:hardenWebContents,
+    getCalendar:()=>winRegistry.calendar, showCalendar:()=>showCalendar({activateApp:true}), hideCalendar:hideCalendarForTab,
+    openSettings:createSettingsWindow,
+  });
+  if(process.argv.includes('--desktop-tab')) { appSettings.desktopTab.enabled=true; scheduleSettingsCommit(); }
+  if(appSettings.desktopTab.enabled) tabController.sync();
+}
 function showCalendar({activateApp=false}={}){
   const w=winRegistry.calendar&&!winRegistry.calendar.isDestroyed()?winRegistry.calendar:createCalendarWindow();
   ensureWindowVisible(w);
@@ -1816,6 +1847,7 @@ function expandCalendar(cal,hoverExpanded=false){
 }
 
 function checkEdgeAutoHide(){
+  if(appSettings.desktopTab.enabled) return;
   if(_edgeResizing) return; // prevent recursive calls from setBounds→resize
   const cal=winRegistry.calendar;
   if(!cal||cal.isDestroyed()||!cal.isVisible()) {
@@ -2112,7 +2144,7 @@ function tidyAllNotes(){
 
 // ── Broadcast ──
 function broadcastSettings(){
-  const all=[winRegistry.calendar,winRegistry.settings,...Object.values(winRegistry.notes)].filter(Boolean);
+  const all=[winRegistry.calendar,winRegistry.settings,tabController?.getWindow(),...Object.values(winRegistry.notes)].filter(Boolean);
   all.forEach(w=>{if(!w.isDestroyed())w.webContents.send('settings-changed',{
     themeMode: appSettings.themeMode,
     ...getLoginItemSnapshot(),
@@ -2122,6 +2154,7 @@ function broadcastSettings(){
     globalFontSize: appSettings.globalFontSize,
     calendar: {...appSettings.calendar},
     notes: {...appSettings.notes},
+    desktopTab: {...appSettings.desktopTab},
   })});
 }
 
@@ -2757,6 +2790,7 @@ function setupIPC(){
     globalFontSize: appSettings.globalFontSize,
     calendar: {...appSettings.calendar},
     notes: {...appSettings.notes},
+    desktopTab: {...appSettings.desktopTab},
   }));
   ipcMain.handle('get-system-fonts',()=>getSystemFonts());
   ipcMain.handle('get-notification-settings',()=>getSystemNotificationSettings());
@@ -2789,6 +2823,15 @@ function setupIPC(){
     return {ok:true,enabled:appSettings.startMinimized};
   });
   ipcMain.on('set-setting',(_event,scope,key,value)=>{
+    if(scope==='desktopTab'){
+      const next=desktopTab.sanitize(key,value);
+      if(next===undefined) return;
+      const wasEnabled=appSettings.desktopTab.enabled;
+      appSettings.desktopTab[key]=next;
+      applyDesktopTabMode(!wasEnabled && appSettings.desktopTab.enabled);
+      if(wasEnabled && !appSettings.desktopTab.enabled) showCalendar();
+      scheduleSettingsCommit(); return;
+    }
     const sanitizedValue=sanitizeSettingChange(scope,key,value);
     if(sanitizedValue===undefined) return;
     if(scope==='theme'){
@@ -2817,6 +2860,10 @@ function setupIPC(){
     scheduleSettingsCommit();
   });
   ipcMain.on('set-reduced-motion',(_e,reduced)=>{prefersReducedMotion=reduced===true});
+  ipcMain.on('desktop-tab-action',(event,action)=>{
+    if(action==='reset' && BrowserWindow.fromWebContents(event.sender)!==winRegistry.settings) return;
+    tabController?.action(event.sender,action);
+  });
   ipcMain.on('set-window-draft-state',(event,entries)=>{
     if(!BrowserWindow.fromWebContents(event.sender)) return;
     const safeEntries=sanitizeDraftEntries(entries);
@@ -3342,8 +3389,11 @@ function setupIPC(){
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
-  app.on('second-instance',()=>{
-    if (app.isReady()) showCalendar();
+  app.on('second-instance',(_event,argv)=>{
+    if (!app.isReady()) return;
+    if(argv.includes('--desktop-tab')){
+      appSettings.desktopTab.enabled=true; applyDesktopTabMode(true); scheduleSettingsCommit();
+    }else showCalendar();
   });
   app.whenReady().then(async()=>{
     if(process.platform==='win32') app.setAppUserModelId(notificationAppIdentity.id);
@@ -3366,7 +3416,8 @@ if (!hasSingleInstanceLock) {
     loadReminderState();
     setupIPC();createTray();
     const loginState = process.platform === 'darwin' ? app.getLoginItemSettings() : null;
-    if(!shouldStartHidden(appSettings, loginState)) createCalendarWindow();
+    initializeDesktopTab();
+    if(!appSettings.desktopTab.enabled && !shouldStartHidden(appSettings, loginState)) createCalendarWindow();
     noteCacheHydrationPromise=(async()=>{
       try {
         migrateLegacyNotesFile();
@@ -3421,6 +3472,7 @@ if (!hasSingleInstanceLock) {
       return;
     }
     app.isQuitting=true;
+    tabController?.dispose();
     clearTimeout(boundsSaveTimer);
     if(settingsSaveTimer) clearTimeout(settingsSaveTimer);
     if(settingsBroadcastTimer) clearTimeout(settingsBroadcastTimer);

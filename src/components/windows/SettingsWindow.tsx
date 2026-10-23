@@ -10,6 +10,7 @@ import { clampFontSize } from '@/lib/typography'
 import type { PerWindowSettings } from '@/types/electron'
 import { AppearancePanel } from '@/components/settings/AppearancePanel'
 import { GlobalFontPanel } from '@/components/settings/GlobalFontPanel'
+import { DesktopTabPanel } from '@/components/settings/DesktopTabPanel'
 import { SystemNotificationStatus } from '@/components/SystemNotificationStatus'
 
 type SettingsTab = 'global' | 'calendar' | 'notes' | 'manage' | 'tags'
@@ -500,6 +501,7 @@ export function SettingsWindow() {
 
         {activeTab === 'calendar' && (
           <>
+            <DesktopTabPanel />
             <div className="settings-toggle-row flex items-start justify-between gap-4 px-1 py-2">
               <div>
                 <span className="text-sm font-medium">贴边自动收起</span>
@@ -543,7 +545,7 @@ export function SettingsWindow() {
 
         {activeTab === 'notes' && (
           <>
-            <p className="mb-3 px-0.5 text-[11px] leading-relaxed opacity-60">便签颜色在每张便签的菜单中单独设置，主题切换不会覆盖。这里仅调整全部便签的字体、字号与不透明度。</p>
+            <p className="mb-3 px-0.5 text-[11px] leading-relaxed opacity-60">每张便签的「⋯」菜单可设置预设色、自定义背景颜色和背景透明度。这里调整全局字体及默认不透明度；单独设置过透明度的便签不受全局调整影响。</p>
             <AppearancePanel settings={notesSettings} systemFonts={systemFonts} onUpdate={handleNotesUpdate} textColor={textColor} showColorControls={false} />
           </>
         )}

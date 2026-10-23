@@ -3,6 +3,7 @@ export interface Note {
   revision?: number
   title: string
   color: string
+  backgroundOpacity?: number | null
   items: NoteItem[]
   noteType: 'independent' | 'echo' | 'view' | 'daily'
   echoTagId?: string

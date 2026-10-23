@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import type { CalendarEvent, EventRecurrence } from "@/types/calendar.types"
 import type { Note } from "@/types/notes.types"
+import { normalizeNoteOpacity } from './note-appearance'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -671,6 +672,7 @@ export function normalizeNote(raw: unknown): Note {
         }
       : { dailyTodo: undefined }),
     color: normalizeHexColor(n.color),
+    backgroundOpacity: normalizeNoteOpacity(n.backgroundOpacity),
     isDocked: typeof n.isDocked === 'boolean' ? n.isDocked : noteType === 'view',
     dockedOrder: typeof n.dockedOrder === 'number' ? n.dockedOrder : undefined,
     isHidden: n.isHidden === true,

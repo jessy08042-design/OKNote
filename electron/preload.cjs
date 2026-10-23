@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
+  desktopTabAction: (action) => ipcRenderer.send('desktop-tab-action', action),
   platform: process.platform,
   ...(process.env.OKNOTE_E2E_TEST === '1'
     ? { finishIsolatedTest: () => ipcRenderer.invoke('__finish-isolated-test') }

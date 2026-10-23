@@ -8,7 +8,25 @@ export interface PerWindowSettings {
   showDockArea?: boolean;
 }
 
+export interface DesktopTabSettings {
+  enabled: boolean;
+  label: string;
+  backgroundColor: string;
+  textColor: string;
+  opacity: number;
+  width: number;
+  height: number;
+  radius: number;
+  fontSize: number;
+  alwaysOnTop: boolean;
+  locked: boolean;
+  side: 'left' | 'right';
+  ratio: number;
+  displayId: number | null;
+}
+
 export interface AllSettings {
+  desktopTab: DesktopTabSettings;
   themeMode: 'dark' | 'light';
   autoLaunch: boolean;
   autoLaunchStatus?: string;
@@ -95,6 +113,7 @@ export type EventMutationRequest =
   | { type: 'delete'; id: string; expectedRevision?: number; expectedUpdatedAt?: string };
 
 export interface ElectronAPI {
+  desktopTabAction: (action: 'down' | 'up' | 'cancel' | 'toggle' | 'menu' | 'reset') => void;
   isElectron: boolean;
   platform: string;
 

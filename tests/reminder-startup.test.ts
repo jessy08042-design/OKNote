@@ -26,7 +26,7 @@ function bootHarness() {
     registerNotificationIdentity: () => identity, nativeNotificationIdentityReady: false, reminderDeliveryReady: false, reminderScanRunning: false, reminderRetryPending: false,
     Menu: { setApplicationMenu: vi.fn() },
     session: { defaultSession: { setPermissionCheckHandler: vi.fn(), setPermissionRequestHandler: vi.fn() } },
-    appSettings: {}, windowBounds: {}, winRegistry: { calendar: null, settings: null, notes: {} },
+    appSettings: { desktopTab: { enabled: false } }, tabController: null, windowBounds: {}, winRegistry: { calendar: null, settings: null, notes: {} },
     noteCacheHydrationPromise: null, noteCacheReady: false, eventsLoadError: null,
     reminderDeliveryKeys:new Set(),reminderReadDuringDelivery:new Set(),
     reminderState: { fired: {} }, reminderHistory: [], reminderTimer: null,
@@ -41,7 +41,7 @@ function bootHarness() {
     setInterval: vi.fn(() => 1), clearInterval: vi.fn(), clearTimeout: vi.fn(),
   })
   for (const name of ['ensureDataDir', 'prepareLegacyLocalData', 'loadSettings', 'loadWindowBounds', 'setupIPC', 'createTray',
-    'createCalendarWindow', 'showCalendar', 'migrateLegacyNotesFile', 'ensureSingleDailyNote', 'ensureUniqueViewNotes',
+    'createCalendarWindow', 'showCalendar', 'initializeDesktopTab', 'migrateLegacyNotesFile', 'ensureSingleDailyNote', 'ensureUniqueViewNotes',
     'broadcastSettings', 'notifyNotesChanged', 'queueStartupReliabilityIssue', 'applyLoginItemSettings', 'loadSystemFontsAsync',
     'checkEventReminders', 'saveSettings', 'saveWindowBounds', 'requestAppQuit', 'broadcastReminderHistory']) context[name] = vi.fn()
   const fragment = (start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end))

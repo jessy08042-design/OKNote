@@ -1,3 +1,5 @@
+import { NoteAppearanceControls } from '@/components/notes/NoteAppearanceControls'
+import { resolveNoteOpacity } from '@/lib/note-appearance'
 import { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNotesStore } from '@/stores/notes.store'
@@ -7,7 +9,7 @@ import { TodoItem } from '@/components/notes/TodoItem'
 import { EchoEventList } from '@/components/notes/EchoEventList'
 import { QuickEventForm } from '@/components/notes/QuickEventForm'
 import { Plus, MoreHorizontal } from '@/components/ui/icons'
-import { NOTE_COLOR_PALETTE, focusAdjacentInteractiveElement, isImeComposing, isLightColor, normalizeHexColor, isTodoOverdue } from '@/lib/utils'
+import { focusAdjacentInteractiveElement, isImeComposing, isLightColor, normalizeHexColor, isTodoOverdue } from '@/lib/utils'
 import { useCurrentDateKey } from '@/hooks/useCurrentDateKey'
 import type { EventTag } from '@/types/tag.types'
 import type { PerWindowSettings } from '@/types/electron'
@@ -71,7 +73,7 @@ export function DockedNoteCard({ note, isActive, attention = false, noteSettings
     .filter((tag): tag is EventTag => !!tag)
   const noteColor = normalizeHexColor(note.color)
   const noteSurfaceColor = noteColor
-  const noteOpacity = noteSettings.backgroundOpacity
+  const noteOpacity = resolveNoteOpacity(note.backgroundOpacity, noteSettings.backgroundOpacity)
   const bgWithAlpha = noteSurfaceColor + Math.round(noteOpacity * 255).toString(16).padStart(2, '0').slice(0, 2)
   const lightBg = isLightColor(noteSurfaceColor)
   const textColor = lightBg ? '#111827' : '#f8fafc'
@@ -175,16 +177,11 @@ export function DockedNoteCard({ note, isActive, attention = false, noteSettings
     }
   }, [note])
 
-  const updateColor = useCallback((color: string) => {
-    persistNote({ ...note, color, updatedAt: new Date().toISOString() })
-    setShowMenu(false)
-  }, [note, persistNote])
-
   const openMenu = useCallback(() => {
     if (menuBtnRef.current) {
       const rect = menuBtnRef.current.getBoundingClientRect()
-      const menuWidth = 192
-      const menuHeight = isEcho ? 252 : 162
+      const menuWidth = Math.min(224, window.innerWidth - 16)
+      const menuHeight = Math.min(isEcho ? 480 : 420, window.innerHeight - 16)
       const maxLeft = Math.max(8, window.innerWidth - menuWidth - 8)
       const left = Math.max(8, Math.min(maxLeft, rect.right - menuWidth))
       const preferredTop = rect.top > menuHeight + 8
@@ -570,33 +567,14 @@ export function DockedNoteCard({ note, isActive, attention = false, noteSettings
       {showMenu && createPortal(
         <div className="fixed inset-0 z-[9999]" onClick={() => setShowMenu(false)}>
           <div
-            className="absolute max-h-[calc(100vh-16px)] w-48 overflow-y-auto bg-background/95 backdrop-blur-xl border border-white/8 rounded-lg shadow-2xl py-1 z-[10000]"
+            className="absolute max-h-[calc(100vh-16px)] w-[min(14rem,calc(100vw-16px))] overflow-y-auto bg-background/95 backdrop-blur-xl border border-white/8 rounded-lg shadow-2xl py-1 z-[10000]"
             style={{ top: menuPos.top, left: menuPos.left }}
             onClick={(e) => e.stopPropagation()}
             role="menu"
             aria-label="便签操作"
             onKeyDown={handleMenuKeyDown}
           >
-            <div className="px-3 py-2">
-              <div className="flex gap-1.5 flex-wrap">
-                {NOTE_COLOR_PALETTE.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => updateColor(color)}
-                    className={`touch-target h-6 w-6 rounded-full transition-transform hover:scale-110 ${color === noteColor ? 'ring-2 ring-white/70 ring-offset-1 ring-offset-background' : ''}`}
-                    style={{
-                      backgroundColor: color,
-                      boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.18), 0 0 0 1px rgba(255,255,255,0.20)',
-                    }}
-                    title="更换颜色"
-                    aria-label={`将便签颜色设为 ${color}`}
-                    role="menuitemradio"
-                    aria-checked={color === noteColor}
-                    autoFocus={color === NOTE_COLOR_PALETTE[0]}
-                  />
-                ))}
-              </div>
-            </div>
+            <NoteAppearanceControls note={note} globalOpacity={noteSettings.backgroundOpacity} />
             {isEcho && (
               <>
                 <div className="border-t my-1" style={{ borderColor: 'rgba(255,255,255,0.06)' }} />

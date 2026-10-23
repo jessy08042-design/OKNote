@@ -22,6 +22,8 @@
     "lint": "tsc --noEmit -p tsconfig.app.json",
     "test": "vitest run && npm run test:reminder-performance",
     "test:reminder-performance": "node scripts/reminder-performance-qa.cjs",
+    "test:desktop-tab": "node scripts/desktop-tab-qa.cjs",
+    "test:note-appearance": "node scripts/note-appearance-qa.cjs",
     "test:electron-smoke": "node scripts/electron-smoke.cjs",
     "test:electron-e2e": "node scripts/electron-stability-e2e.cjs",
     "test:electron-qa": "node scripts/electron-feature-qa.cjs",
