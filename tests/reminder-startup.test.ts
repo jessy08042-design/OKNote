@@ -41,7 +41,7 @@ function bootHarness() {
     setInterval: vi.fn(() => 1), clearInterval: vi.fn(), clearTimeout: vi.fn(),
   })
   for (const name of ['ensureDataDir', 'prepareLegacyLocalData', 'loadSettings', 'loadWindowBounds', 'setupIPC', 'createTray',
-    'createCalendarWindow', 'showCalendar', 'initializeDesktopTab', 'migrateLegacyNotesFile', 'ensureSingleDailyNote', 'ensureUniqueViewNotes',
+    'createCalendarWindow', 'showCalendar', 'initializeDesktopTab', 'applyDesktopTabMode', 'scheduleSettingsCommit', 'migrateLegacyNotesFile', 'ensureSingleDailyNote', 'ensureUniqueViewNotes',
     'broadcastSettings', 'notifyNotesChanged', 'queueStartupReliabilityIssue', 'applyLoginItemSettings', 'loadSystemFontsAsync',
     'checkEventReminders', 'saveSettings', 'saveWindowBounds', 'requestAppQuit', 'broadcastReminderHistory']) context[name] = vi.fn()
   const fragment = (start: string, end: string) => source.slice(source.indexOf(start), source.indexOf(end))
@@ -109,4 +109,28 @@ describe('reminder startup races', () => {
     expect(h.files.get('reminder-state.json')).toEqual(h.checkpoint)
   })
 
+})
+
+describe('desktop shortcut relaunch', () => {
+  it.each([
+    { enabled: true, argv: ['oknote', '--desktop-tab'], enablesMode: false },
+    { enabled: false, argv: ['oknote', '--desktop-tab'], enablesMode: true },
+    { enabled: true, argv: ['oknote'], enablesMode: false },
+    { enabled: false, argv: ['oknote'], enablesMode: false },
+  ])('opens rather than hides the calendar on repeated launches: %j', async ({ enabled, argv, enablesMode }) => {
+    const h = bootHarness()
+    h.context.appSettings.desktopTab.enabled = enabled
+    const before = structuredClone([...h.files])
+    h.app.emit('second-instance', {}, argv)
+    h.app.emit('second-instance', {}, argv)
+    expect(h.context.showCalendar).toHaveBeenCalledTimes(2)
+    expect(h.context.showCalendar).toHaveBeenNthCalledWith(1, { activateApp: true })
+    expect(h.context.showCalendar).toHaveBeenNthCalledWith(2, { activateApp: true })
+    expect(h.context.applyDesktopTabMode).not.toHaveBeenCalledWith(true)
+    expect(h.context.applyDesktopTabMode).toHaveBeenCalledTimes(enablesMode ? 1 : 0)
+    expect(h.context.scheduleSettingsCommit).toHaveBeenCalledTimes(enablesMode ? 1 : 0)
+    expect([...h.files]).toEqual(before)
+    h.resolveIdentity(true)
+    await h.boot()
+  })
 })

@@ -3391,9 +3391,12 @@ if (!hasSingleInstanceLock) {
 } else {
   app.on('second-instance',(_event,argv)=>{
     if (!app.isReady()) return;
-    if(argv.includes('--desktop-tab')){
-      appSettings.desktopTab.enabled=true; applyDesktopTabMode(true); scheduleSettingsCommit();
-    }else showCalendar();
+    // A second launch is an explicit open command, never a collapse command.
+    // --desktop-tab may enable the mode, but must preserve the open calendar.
+    if(argv.includes('--desktop-tab') && !appSettings.desktopTab.enabled){
+      appSettings.desktopTab.enabled=true; applyDesktopTabMode(); scheduleSettingsCommit();
+    }
+    showCalendar({activateApp:true});
   });
   app.whenReady().then(async()=>{
     if(process.platform==='win32') app.setAppUserModelId(notificationAppIdentity.id);
